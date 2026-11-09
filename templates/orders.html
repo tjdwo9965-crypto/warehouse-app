@@ -1,0 +1,284 @@
+{% extends "base.html" %}
+{% block head %}
+<style>
+  .chips { display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap; }
+  .chips button { border:1px solid var(--line); background:#fff; padding:7px 14px; border-radius:999px; color:var(--sub); cursor:pointer; font:inherit; font-weight:700; }
+  .chips button.on { background:#fff1e6; border-color:#fdba74; color:#c2410c; }
+  .state { display:inline-block; padding:3px 10px; border-radius:999px; font-size:13px; font-weight:800; }
+  .state.s-진행중 { background:#fff1e6; color:#c2410c; } .state.s-완료 { background:#ecfdf3; color:#067647; } .state.s-반려 { background:#f1f3f6; color:var(--sub); }
+  /* 목록 */
+  .olist .oh, .olist .orow { display:grid; grid-template-columns:44px 90px 1fr 90px 90px 90px; gap:8px; align-items:center; padding:12px 14px; }
+  .olist .oh { font-size:13px; color:var(--sub); font-weight:600; border-bottom:1px solid var(--line); }
+  .olist .orow { border-bottom:1px solid var(--line); cursor:pointer; } .olist .orow:hover { background:#fffaf5; }
+  .olist .orow.sel { background:#fff1e6; } .olist .orow:last-child { border-bottom:0; }
+  .olist .orow.s-반려 { color:var(--sub); } .olist .orow.s-반려 .rq { text-decoration:line-through; color:var(--sub); }
+  .olist .r { text-align:right; font-variant-numeric:tabular-nums; }
+  .olist .rq { font-size:18px; font-weight:800; color:#c2410c; } .olist .cq { font-weight:800; font-size:16px; } .olist .cq.low { color:var(--out); }
+  .memo-in { width:100%; min-height:60px; word-break:keep-all; resize:vertical; border:1px solid var(--line); border-radius:10px; padding:9px 10px; font:inherit; font-size:15px; }
+  .bitems .bi { flex-wrap:wrap; } .bitems .bi input { flex:1 0 100%; height:38px; border:1px solid var(--line); border-radius:8px; padding:0 10px; font:inherit; font-size:14px; }
+  .memochip { display:inline-block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:bottom; margin-left:6px; font-size:12px; color:var(--sub); font-weight:600; }
+  .pn { font-weight:700; } .pm { color:var(--brand); font-weight:700; }
+  .lbl { display:none; }
+  .orow, .dot { -webkit-tap-highlight-color:transparent; }
+  /* 선택 동그라미 */
+  .dot { width:26px; height:26px; border-radius:50%; border:2px solid #c9cdd4; background:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0; color:#fff; font-size:15px; font-weight:900; }
+  .dot.on { background:var(--order); border-color:var(--order); }
+  .bulk { position:sticky; bottom:12px; margin-top:12px; display:none; align-items:center; gap:8px; flex-wrap:wrap; background:#1d2129; color:#fff; padding:10px 12px 10px 18px; border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,.2); }
+  .bulk.show { display:flex; } .bulk b { margin-right:auto; } .bulk .btn { padding:8px 14px; }
+  /* 상세 팝업 */
+  .dim { position:fixed; inset:0; background:rgba(15,20,30,.45); display:none; align-items:center; justify-content:center; z-index:50; padding:16px; }
+  .dim.show { display:flex; }
+  .modal { background:#fff; border-radius:18px; width:100%; max-width:440px; padding:24px; max-height:92vh; overflow:auto; }
+  .modal h2 { margin:0 0 4px; font-size:21px; } .modal .x { float:right; border:0; background:none; font-size:24px; cursor:pointer; color:var(--sub); }
+  .dl { display:grid; grid-template-columns:110px 1fr; margin:14px 0; border-top:1px solid var(--line); }
+  .dl div { padding:9px 2px; border-bottom:1px solid var(--line); } .dl .k { color:var(--sub); font-size:14px; font-weight:600; }
+  .bitems { margin:12px 0; border-top:1px solid var(--line); } .bitems div { display:flex; justify-content:space-between; gap:8px; padding:9px 2px; border-bottom:1px solid var(--line); }
+  .grp { display:inline-block; margin-left:6px; padding:1px 8px; border-radius:999px; background:#ecfdf3; color:#067647; font-size:12px; font-weight:800; }
+  textarea.msg { width:100%; font:inherit; font-size:16px; padding:12px; border:1px solid var(--line); border-radius:10px; resize:vertical; line-height:1.6; }
+  .mops { display:grid; grid-template-columns:1fr 1fr; gap:8px; } .mops .btn { height:48px; }
+  @media (max-width:760px) {
+    .olist .oh { display:none; }
+    .olist .orow { grid-template-columns:36px 1fr 1fr 1fr; row-gap:6px; padding:12px; }
+    .olist .orow > .c-dot { grid-column:1; grid-row:1 / 4; align-self:start; }
+    .olist .orow > .c-date { grid-column:2 / 5; grid-row:1; font-size:13px; color:var(--sub); }
+    .olist .orow > .c-name { grid-column:2 / 5; grid-row:2; }
+    .olist .orow > .c-n { grid-row:3; text-align:left; } .olist .orow > .n1 { grid-column:2; } .olist .orow > .n2 { grid-column:3; } .olist .orow > .n3 { grid-column:4; }
+    .lbl { display:block; font-size:12px; color:var(--sub); font-weight:600; }
+  }
+</style>
+{% endblock %}
+{% block body %}
+<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:16px">
+  <div><h1>발주요청</h1><p class="desc" style="margin:0">왼쪽 동그라미로 고른 뒤 <b style="color:var(--order)">진행</b>을 누르면 ‘제품명 / 수량’ 발주 문구가 떠서 복사해 보낼 수 있습니다. 함께 완료한 건은 완료 탭에 한 줄로 묶입니다.</p></div>
+  <a class="btn primary" id="xlsBtn" href="/download/order">⬇ 발주요청 Excel</a>
+</div>
+<div class="chips" id="chips">
+  <button data-f="진행중" class="on">진행중</button><button data-f="완료">완료</button><button data-f="반려">반려</button><button data-f="">전체</button>
+  <button id="selAll" onclick="toggleAll()" style="margin-left:auto">○ 전체 선택</button>
+</div>
+<div class="card olist" id="liveOrders" data-live>
+  <div class="oh"><div><button class="dot" id="allDot" title="전체 선택" onclick="toggleAll()"></button></div><div>요청일시</div><div>제품명 [제조사]</div><div class="r">요청수량</div><div class="r">현재고</div><div class="r">안전재고</div></div>
+  {% for g in groups %}{% set f = g['items'][0] %}
+  <div class="orow s-{{ g.state }}" data-state="{{ g.state }}" data-key="{{ g.key }}" onclick="openDetail(this.dataset.key)">
+    <div class="c-dot"><button class="dot" onclick="event.stopPropagation();toggleSel(this.closest('.orow'))"></button></div>
+    <div class="c-date">{{ g.date }}</div>
+    <div class="c-name"><span class="pn">{{ f.name }}</span> <span class="pm">[{{ f.maker }}]</span>{% if g.n > 1 %} <b>외 {{ g.n - 1 }}건</b><span class="grp">묶음</span>{% endif %}{% set memos = g['items']|map(attribute='memo')|select|list %}{% if memos %}<span class="memochip" title="{{ memos|join(' / ') }}">📝 {{ memos|join(' / ') }}</span>{% endif %}</div>
+    <div class="r c-n n1"><span class="lbl">요청수량{{ ' 합계' if g.n > 1 }}</span><span class="rq">{{ "{:,}".format(g.qty) }}</span></div>
+    {% if g.n > 1 %}
+    <div class="r c-n n2"><span class="lbl">현재고</span>-</div><div class="r c-n n3"><span class="lbl">안전재고</span>-</div>
+    {% else %}
+    <div class="r c-n n2"><span class="lbl">현재고</span><span class="cq {{ 'low' if f.cur_qty is not none and f.cur_qty < f.cur_safety }}">{{ "{:,}".format(f.cur_qty) if f.cur_qty is not none else '-' }}</span></div>
+    <div class="r c-n n3"><span class="lbl">안전재고</span>{{ "{:,}".format(f.cur_safety) if f.cur_safety is not none else '-' }}</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+  <div id="none" style="text-align:center;color:var(--sub);padding:40px">해당하는 발주요청이 없습니다.</div>
+  <script type="application/json" id="groupsData">{{ groups|tojson }}</script>
+</div>
+<div class="bulk" id="bulk">
+  <b id="bulkN"></b>
+  <button class="btn order" id="bDone" onclick="bulk('완료')">진행</button>
+  <button class="btn" id="bCancel" onclick="bulk('반려')">반려</button>
+  <button class="btn" id="bBack" onclick="bulk('진행중')">진행중으로 되돌리기</button>
+  <button class="btn" onclick="clearSel()" style="background:none;color:#fff;border-color:#4b5563">선택 해제</button>
+</div>
+<p class="desc" style="margin-top:12px">💡 ‘완료’는 발주 처리 기록일 뿐이며 재고 수량은 바뀌지 않습니다. 물건이 들어오면 재고현황에서 ‘입고’로 수량을 올려 주세요.</p>
+
+<!-- 상세 팝업 -->
+<div class="dim" id="detail" onclick="if(event.target===this)closeD()">
+  <div class="modal">
+    <button class="x" onclick="closeD()">×</button>
+    <h2 id="dTitle"></h2>
+    <div id="dNo" style="font-family:monospace;color:var(--sub)"></div>
+    <div id="dBody"></div>
+    <div class="mops" id="dOps" style="margin-top:12px"></div>
+    <a class="btn" id="dGo" style="width:100%;margin-top:8px">제품 화면으로 이동 (입고 · 출고)</a>
+  </div>
+</div>
+
+<!-- 발주 문구 (완료 처리 직후 / 완료 묶음에서 다시 보기) -->
+<div class="dim" id="msgBox">
+  <div class="modal">
+    <h2>✔ 발주 문구</h2>
+    <p class="desc" style="margin:4px 0 12px" id="msgDesc">복사해서 문자·카톡으로 보내세요. 보내기 전에 내용을 고칠 수 있습니다.</p>
+    <textarea id="msgText" class="msg" rows="9"></textarea>
+    <div class="mops" style="margin-top:10px">
+      <button class="btn order" id="bCopy" onclick="copyMsg()">📋 복사하기</button>
+      <button class="btn" id="bShare" onclick="shareMsg()">📤 공유하기</button>
+    </div>
+    <button class="btn" style="width:100%;height:48px;margin-top:8px" onclick="closeMsg()">닫기</button>
+  </div>
+</div>
+{% endblock %}
+{% block script %}
+<script>
+let filt = '진행중';
+let GROUPS = JSON.parse(document.getElementById('groupsData').textContent);
+// 새 목록이 들어오면 데이터 교체 후 필터·선택 표시 다시 적용 (없어진 선택은 정리)
+window.onLive = () => {
+  GROUPS = JSON.parse(document.getElementById('groupsData').textContent);
+  [...sel].forEach(k => { if (!grp(k)) sel.delete(k); });
+  apply();
+};
+const sel = new Set();
+const $ = id => document.getElementById(id);
+const fmt = n => n === null || n === undefined ? '-' : Number(n).toLocaleString('ko-KR');
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const rows = () => [...document.querySelectorAll('.orow')];
+const visible = () => rows().filter(r => r.style.display !== 'none');
+const grp = key => GROUPS.find(g => g.key === key);
+const LABEL = { '완료':'발주 진행(완료)', '반려':'반려', '진행중':'진행중으로 되돌리기' };
+
+function apply() {
+  let n = 0;
+  rows().forEach(r => { const hit = !filt || r.dataset.state === filt; r.style.display = hit ? '' : 'none'; if (hit) n++; else sel.delete(r.dataset.key); });
+  $('none').style.display = n ? 'none' : '';
+  document.querySelectorAll('#chips button[data-f]').forEach(b => b.classList.toggle('on', b.dataset.f === filt));
+  paint();
+}
+document.querySelectorAll('#chips button[data-f]').forEach(b => b.onclick = () => { filt = b.dataset.f; apply(); });
+
+function toggleSel(r) { sel.has(r.dataset.key) ? sel.delete(r.dataset.key) : sel.add(r.dataset.key); paint(); }
+function toggleAll() { const v = visible(); const all = v.length && v.every(r => sel.has(r.dataset.key)); v.forEach(r => all ? sel.delete(r.dataset.key) : sel.add(r.dataset.key)); paint(); }
+function clearSel() { sel.clear(); paint(); }
+function paint() {
+  rows().forEach(r => { const on = sel.has(r.dataset.key); r.classList.toggle('sel', on); const d = r.querySelector('.dot'); d.classList.toggle('on', on); d.textContent = on ? '✓' : ''; });
+  const v = visible(), all = v.length && v.every(r => sel.has(r.dataset.key));
+  $('allDot').classList.toggle('on', !!all); $('allDot').textContent = all ? '✓' : '';
+  $('selAll').textContent = all ? '✓ 전체 해제' : '○ 전체 선택'; $('selAll').classList.toggle('on', !!all);
+  const picked = [...sel].map(grp).filter(Boolean), st = new Set(picked.map(g => g.state));
+  const cnt = picked.reduce((a, g) => a + g.n, 0);
+  // 완료(PO)를 고르면 위 Excel 버튼이 그 PO만 내려받기 (파일명 = PO 번호)
+  const pos = picked.filter(g => g.state === '완료' && /^B\d+$/.test(g.key)).map(g => g.key);
+  $('xlsBtn').href = pos.length ? '/download/po?b=' + encodeURIComponent(pos.join(',')) : '/download/order';
+  $('xlsBtn').textContent = pos.length ? '⬇ PO ' + (pos.length > 1 ? pos.length + '건' : pos[0]) + ' Excel' : '⬇ 발주요청 Excel';
+  $('bulk').classList.toggle('show', sel.size > 0); $('bulkN').textContent = cnt + '건 선택';
+  $('bDone').style.display = $('bCancel').style.display = st.has('진행중') ? '' : 'none';
+  $('bBack').style.display = (st.has('완료') || st.has('반려')) ? '' : 'none';
+}
+
+// 발주 문구: "제품명 [제조사] / 수량개" (같은 제품은 수량 합침)
+function msgFor(items) {
+  const merged = [];
+  items.forEach(o => { const m = merged.find(x => x.code === o.code); if (m) m.qty += o.qty; else merged.push({ code:o.code, name:o.name, maker:o.maker, qty:o.qty }); });
+  const d = new Date(), ymd = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  return '[발주 요청] ' + ymd + '\n\n' + merged.map((m, i) => (i + 1) + '. ' + m.name + ' [' + m.maker + '] / ' + m.qty.toLocaleString('ko-KR') + '개').join('\n')
+    + '\n\n총 ' + merged.length + '품목 · 감사합니다.';
+}
+function showMsg(items, desc, reload) {
+  $('msgText').value = msgFor(items); $('msgDesc').textContent = desc;
+  $('bShare').style.display = navigator.share ? '' : 'none'; $('bCopy').style.gridColumn = navigator.share ? '' : '1 / 3';
+  closeD(); $('msgBox').classList.add('show');
+}
+// 휴대폰(http 주소)에서도 글자 선택 표시 없이 바로 복사: 화면 밖 임시 칸으로 복사 후 지움
+function copyText(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.setAttribute('readonly', '');
+  ta.style.cssText = 'position:fixed;top:0;left:-9999px;opacity:0;font-size:16px;';
+  document.body.appendChild(ta);
+  ta.select(); ta.setSelectionRange(0, text.length);
+  let ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
+  document.body.removeChild(ta);
+  try { window.getSelection().removeAllRanges(); } catch (e) {}
+  return ok;
+}
+async function copyMsg() {
+  const text = $('msgText').value; $('msgText').blur();
+  let ok = false;
+  if (navigator.clipboard && window.isSecureContext) { try { await navigator.clipboard.writeText(text); ok = true; } catch (e) {} }
+  if (!ok) ok = copyText(text);
+  toast(ok ? '복사했습니다.' : '복사하지 못했습니다. 글자를 길게 눌러 복사해 주세요.', !ok);
+}
+async function shareMsg() { try { await navigator.share({ text:$('msgText').value }); } catch (e) {} }
+function closeMsg() { $('msgBox').classList.remove('show'); }
+
+async function send(keys, state) {
+  const groups = keys.map(grp).filter(Boolean);
+  const items = groups.flatMap(g => g.items).filter(o => state !== '완료' || o.state === '진행중');
+  items.sort((a, b) => a.no.localeCompare(b.no));  // 요청 순서대로
+  const nos = (state === '완료' ? items : groups.flatMap(g => g.items)).map(o => o.no);
+  if (!nos.length) return;
+  const res = await fetch('/api/orders/state', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ nos, state, worker:getWorker() }) });
+  const d = await res.json();
+  if (!d.ok) return toast(d.msg, true);
+  sel.clear(); closeD(); liveRefresh();  // 새로고침 없이 목록·상단 숫자 바로 갱신
+  // 완료로 넘길 때마다 발주 문구 팝업 → 복사해서 발주
+  if (state === '완료' && d.n) showMsg(items, nos.length + '건을 완료했습니다. 아래 문구를 복사해 발주를 보내세요.');
+  else toast(d.msg || '처리했습니다.');
+}
+function bulk(state) {
+  const keys = [...sel]; if (!keys.length) return;
+  const cnt = keys.map(grp).filter(Boolean).reduce((a, g) => a + g.n, 0);
+  if (confirm('선택한 ' + cnt + '건을 ' + LABEL[state] + ' 처리할까요?')) send(keys, state);
+}
+// 발주건별 비고(메모): 적으면 잠시 뒤 자동 저장 (저장 버튼 없음). 창을 닫을 때도 남은 것 저장
+const MEMO_SAVE = '<div id="memoSt" style="font-size:12px;color:var(--sub);text-align:right;margin:-8px 0 10px;min-height:16px"></div>';
+const memoTimers = new Map();
+let memoDirty = false;
+function memoSt(t, err) { const e = $('memoSt'); if (e) { e.textContent = t; e.style.color = err ? 'var(--out)' : 'var(--sub)'; } }
+async function saveMemoField(f) {
+  clearTimeout(memoTimers.get(f)); memoTimers.delete(f);
+  const no = f.dataset.no, memo = f.value.trim();
+  if (memo === (f.dataset.saved || '')) return;
+  memoSt('저장 중…');
+  try {
+    const res = await fetch('/api/orders/memo', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ items:[{ no, memo }] }) });
+    const d = await res.json().catch(() => ({ ok:false, msg:'서버가 예전 버전입니다. 서버를 다시 켜 주세요. (' + res.status + ')' }));
+    if (!d.ok) { memoSt(d.msg, true); return toast(d.msg, true); }
+    f.dataset.saved = memo; memoSt('✓ 비고 저장됨'); memoDirty = true;
+    GROUPS.forEach(g => g.items.forEach(o => { if (o.no === no) o.memo = memo; }));
+  } catch (e) { memoSt('저장하지 못했습니다. 연결을 확인해 주세요.', true); }
+}
+document.addEventListener('input', e => {
+  const f = e.target.closest && e.target.closest('#dBody .memo-f'); if (!f) return;
+  memoSt('');
+  clearTimeout(memoTimers.get(f)); memoTimers.set(f, setTimeout(() => saveMemoField(f), 700));
+});
+document.addEventListener('focusout', e => { const f = e.target.closest && e.target.closest('#dBody .memo-f'); if (f) saveMemoField(f); });
+async function flushMemos() {
+  const fs = [...document.querySelectorAll('#dBody .memo-f')].filter(f => f.value.trim() !== (f.dataset.saved || ''));
+  if (!fs.length) return false;
+  await Promise.all(fs.map(saveMemoField)); return true;
+}
+function openDetail(key) {
+  const g = grp(key); if (!g) return;
+  const o = g.items[0], st = '<span class="state s-' + esc(g.state) + '">' + esc(g.state) + '</span>';
+  $('detail').dataset.key = key;
+  if (g.n > 1) {  // 묶음
+    $('dTitle').innerHTML = esc(o.name) + ' <span class="pm">[' + esc(o.maker) + ']</span> 외 ' + (g.n - 1) + '건';
+    $('dNo').textContent = 'PO ' + g.key;
+    $('dBody').innerHTML = '<div class="dl"><div class="k">상태</div><div>' + st + ' <span style="font-size:13px;color:var(--sub)">' + esc(o.done_at.slice(0,16)) + ' ' + esc(o.done_by) + '</span></div>'
+      + '<div class="k">요청수량 합계</div><div><b style="font-size:18px;color:#c2410c">' + fmt(g.qty) + '</b></div></div>'
+      + '<div class="bitems">' + g.items.map(i => '<div class="bi"><span><b>' + esc(i.name) + '</b> <span class="pm">[' + esc(i.maker) + ']</span> <span style="font-family:monospace;font-size:12px;color:var(--sub)">' + esc(i.no) + '</span></span><b style="color:#c2410c">' + fmt(i.qty) + '개</b>'
+        + '<input class="memo-f" data-no="' + esc(i.no) + '" data-saved="' + esc(i.memo) + '" value="' + esc(i.memo) + '" placeholder="비고 (메모)" maxlength="500"></div>').join('') + '</div>' + MEMO_SAVE;
+    $('dGo').style.display = 'none';
+  } else {
+    $('dTitle').innerHTML = esc(o.name) + ' <span class="pm">[' + esc(o.maker) + ']</span>';
+    $('dNo').textContent = o.no + ' · ' + o.code + (o.batch ? ' · PO ' + o.batch : '');
+    const items = [
+      ['상태', st + (o.done_at ? ' <span style="font-size:13px;color:var(--sub)">' + esc(o.done_at.slice(0,16)) + ' ' + esc(o.done_by) + '</span>' : '')],
+      ['요청일시', esc(o.at)], ['요청수량', '<b style="font-size:18px;color:#c2410c">' + fmt(o.qty) + '</b>'],
+      ['적재위치', esc(o.loc)], ['요청시 재고', fmt(o.stock)], ['요청시 안전재고', fmt(o.safety)],
+      ['지금 현재고', fmt(o.cur_qty)], ['지금 안전재고', fmt(o.cur_safety)],
+      ['요청자', esc(o.worker) || '-'],
+      ['비고', '<textarea class="memo-in memo-f" data-no="' + esc(o.no) + '" data-saved="' + esc(o.memo) + '" maxlength="500" placeholder="메모를 적어 두세요">' + esc(o.memo) + '</textarea>'],
+    ];
+    $('dBody').innerHTML = '<div class="dl">' + items.map(([k, v]) => '<div class="k">' + k + '</div><div>' + v + '</div>').join('') + '</div>' + MEMO_SAVE;
+    $('dGo').style.display = ''; $('dGo').href = '/?open=' + encodeURIComponent(o.code);
+  }
+  $('dOps').innerHTML = g.state === '진행중'
+    ? '<button class="btn order" onclick="one(\'완료\')">진행</button><button class="btn" onclick="one(\'반려\')">반려</button>'
+    : (g.state === '완료' ? '<button class="btn order" onclick="reMsg()">📋 문구 보기</button><a class="btn" style="grid-column:1/3" href="/download/po?b=' + encodeURIComponent(g.key) + '">⬇ PO ' + esc(g.key) + ' Excel</a>' : '')
+      + '<button class="btn" style="' + (g.state === '완료' ? '' : 'grid-column:1/3') + '" onclick="one(\'진행중\')">되돌리기</button>';
+  $('detail').classList.add('show');
+}
+function reMsg() { const g = grp($('detail').dataset.key); showMsg(g.items, '이 묶음의 발주 문구입니다.', false); }
+function one(state) {
+  const g = grp($('detail').dataset.key);
+  if (confirm((g.n > 1 ? g.n + '건을 ' : '이 발주요청을 ') + LABEL[state] + ' 처리할까요?')) send([g.key], state);
+}
+function closeD() { $('detail').classList.remove('show'); flushMemos().then(() => { if (memoDirty) { memoDirty = false; liveRefresh(); } }); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeD(); if ($('msgBox').classList.contains('show')) closeMsg(); } });
+apply();
+</script>
+{% endblock %}

@@ -1,0 +1,25 @@
+# 데이터(엑셀 DB, 사진, 기기 등록) - 저장소에 올리지 않음
+data/
+*.xlsx
+!재고_일괄입력_양식.xlsx
+images/
+photos/
+uploads/
+
+# 백업·로그
+backups/
+logs/
+*.log
+전원진단.txt
+
+# 파이썬/환경
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+
+# OS
+Thumbs.db
+desktop.ini
+.DS_Store

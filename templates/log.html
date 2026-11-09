@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block body %}
+<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:16px">
+  <div><h1>변경로그</h1><p class="desc" style="margin:0">모든 수량 변경은 <b>data/변경로그.xlsx</b>에 기록됩니다. (최근 200건 표시)</p></div>
+  <a class="btn primary" href="/download/log">⬇ 로그 Excel 다운로드</a>
+</div>
+<div class="card table-scroll"><table>
+  <tr>{% for c in cols %}<th class="{{ 'num' if c in ['변경전 재고','변경수량','변경후 재고'] }}">{{ c }}</th>{% endfor %}</tr>
+  {% for r in logs %}
+  <tr>
+    <td>{{ r[0] }}</td>
+    <td><b style="color:{{ 'var(--in)' if r[1] in ['입고','신규등록','일괄신규','초기등록'] else 'var(--out)' if r[1]=='출고' else 'var(--order)' if (r[1] or '').startswith('발주') else 'var(--text)' }}">{{ r[1] }}</b></td>
+    <td><b>{{ r[2] }}</b></td><td>{{ r[3] }}</td><td>{{ r[4] }}</td>
+    <td class="num">{{ r[5] }}</td>
+    <td class="num" style="font-weight:700;color:{{ 'var(--in)' if (r[6] or 0) > 0 else 'var(--out)' if (r[6] or 0) < 0 else 'inherit' }}">{{ '+' if (r[6] or 0) > 0 }}{{ r[6] }}</td>
+    <td class="num"><b>{{ r[7] }}</b></td><td>{{ r[8] or '' }}</td><td style="color:var(--sub)">{{ r[9] or '' }}</td>
+    <td style="font-family:monospace">{{ r[10] or '' }}</td>
+  </tr>
+  {% else %}<tr><td colspan="11" style="text-align:center;color:var(--sub);padding:40px">기록이 없습니다.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

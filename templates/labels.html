@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block head %}
+<style>
+  .sheet { display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:12px; }
+  .lab { background:#fff; border:1px dashed #b0b6c0; border-radius:8px; padding:12px 14px; text-align:center; break-inside:avoid; page-break-inside:avoid; }
+  .lab .nm { font-weight:800; font-size:17px; } .lab .mk { color:#333; font-weight:700; }
+  .lab .loc { font-family:monospace; font-size:13px; color:#555; margin-top:2px; }
+  .lab svg { display:block; margin:8px auto 2px; max-width:100%; }
+  .lab .cd { font-family:monospace; font-size:18px; font-weight:800; letter-spacing:2px; }
+  .single .sheet { grid-template-columns:minmax(260px, 360px); justify-content:center; }
+  @media print {
+    header, .noprint, .flash { display:none !important; }
+    body { background:#fff; } main { padding:0; }
+    .sheet { grid-template-columns:repeat(3, 1fr); gap:4mm; }
+    .single .sheet { grid-template-columns:70mm; justify-content:start; }
+    .lab { border:1px dashed #999; border-radius:0; }
+  }
+</style>
+{% endblock %}
+{% block body %}
+<div class="{{ 'single' if single }}">
+  <div class="noprint" style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:16px">
+    <div><h1>바코드 라벨</h1><p class="desc" style="margin:0">{{ '이 제품의 라벨입니다.' if single else '전체 제품 ' ~ labels|length ~ '개의 라벨입니다.' }} 인쇄 후 잘라서 제품/선반에 붙이세요. (Code128)</p></div>
+    <div style="display:flex;gap:8px">
+      {% if single %}<a class="btn" href="/labels">전체 라벨</a>{% endif %}
+      <button class="btn primary" onclick="print()">🖨 인쇄</button>
+    </div>
+  </div>
+  <div class="sheet">
+    {% for it, svg in labels %}
+    <div class="lab">
+      <div><span class="nm">{{ it.name }}</span> <span class="mk">[{{ it.maker }}]</span></div>
+      <div class="loc">{{ it.loc }}</div>
+      {{ svg }}
+      <div class="cd">{{ it.code }}</div>
+    </div>
+    {% else %}<p class="desc">등록된 제품이 없습니다.</p>{% endfor %}
+  </div>
+</div>
+{% endblock %}

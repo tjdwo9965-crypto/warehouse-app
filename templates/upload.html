@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block head %}
+<style>
+  .steps { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:20px; }
+  .steps .card { padding:18px; } .steps b { display:block; font-size:16px; margin:6px 0; }
+  .steps .n { display:inline-block; width:26px; height:26px; line-height:26px; text-align:center; border-radius:50%; background:var(--brand); color:#fff; font-weight:800; font-size:14px; }
+  .steps p { color:var(--sub); margin:0 0 12px; font-size:14px; }
+  .drop { border:2px dashed #c9cdd4; border-radius:12px; padding:16px; text-align:center; cursor:pointer; color:var(--sub); }
+  .drop.over { border-color:var(--brand); background:#f2f6ff; }
+  .tag { padding:3px 8px; border-radius:6px; font-size:12px; font-weight:700; }
+  .tag.신규 { background:#ecfdf3; color:#067647; } .tag.수정 { background:#eef2ff; color:var(--brand); } .tag.변경없음 { background:#f1f3f6; color:var(--sub); }
+  .plus { color:var(--in); font-weight:700; } .minus { color:var(--out); font-weight:700; }
+  .errs { background:#fef3f2; color:#b42318; padding:12px 16px; border-radius:10px; margin-bottom:16px; }
+  @media (max-width:700px) { .steps { grid-template-columns:1fr; } }
+</style>
+{% endblock %}
+{% block body %}
+<h1>엑셀 일괄입력</h1>
+<p class="desc">양식에 재고를 한 번에 입력해 올리면, 미리보기로 확인한 뒤 적용됩니다.</p>
+
+<div class="steps">
+  <div class="card"><span class="n">1</span><b>양식 내려받기</b><p>현재 재고가 미리 채워진 양식입니다. 수량만 고치거나 행을 추가하세요.</p>
+    <a class="btn primary" href="/template">⬇ 양식 다운로드</a></div>
+  <div class="card"><span class="n">2</span><b>작성 후 업로드</b><p>제품명 · 제조사 · 적재위치 · 현재고수량 (+ 선택: 안전재고 · 긴급도 A/B/C, 비우면 유지)</p>
+    <form method="post" action="/upload" enctype="multipart/form-data" id="upForm">
+      <label class="drop" id="drop">📄 파일을 끌어다 놓거나 클릭<input type="file" name="file" accept=".xlsx" hidden id="file"></label>
+    </form></div>
+  <div class="card"><span class="n">3</span><b>확인 후 적용</b><p>변경될 내용을 확인하고 ‘적용하기’를 누르면 Excel에 저장되고 로그가 남습니다.</p></div>
+</div>
+
+{% if rows is not none %}
+  {% if errors %}<div class="errs"><b>적용되지 않는 행 {{ errors|length }}건</b><br>{% for e in errors %}{{ e }}<br>{% endfor %}</div>{% endif %}
+  {% set todo = rows | rejectattr('status','equalto','변경없음') | list %}
+  <form method="post" action="/upload/apply" class="card">
+    <div style="padding:16px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <div><b>{{ filename }}</b> · 신규 {{ rows|selectattr('status','equalto','신규')|list|length }}건 ·
+        수정 {{ rows|selectattr('status','equalto','수정')|list|length }}건 · 변경없음 {{ rows|selectattr('status','equalto','변경없음')|list|length }}건</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input name="worker" placeholder="담당자" style="width:120px">
+        <input type="hidden" name="filename" value="{{ filename }}">
+        <button class="btn primary" {{ 'disabled' if not todo }}>적용하기 ({{ todo|length }}건)</button>
+      </div>
+    </div>
+    <div class="table-scroll"><table>
+      <tr><th>구분</th><th>제품명 [제조사]</th><th>적재위치</th><th class="num">현재고</th><th class="num">변경 후</th><th class="num">증감</th><th class="num">안전재고</th><th>긴급도</th></tr>
+      {% for r in rows %}
+      <tr>
+        <td><span class="tag {{ r.status }}">{{ r.status }}</span></td>
+        <td><b>{{ r.name }}</b> <span style="color:var(--brand);font-weight:700">[{{ r.maker }}]</span></td>
+        <td>{% if r.old_loc and r.old_loc != r.loc %}<s style="color:var(--sub)">{{ r.old_loc }}</s> → {% endif %}{{ r.loc }}</td>
+        <td class="num">{{ "{:,}".format(r.before) }}</td>
+        <td class="num"><b>{{ "{:,}".format(r.qty) }}</b></td>
+        {% set d = r.qty - r.before %}
+        <td class="num {{ 'plus' if d > 0 else 'minus' if d < 0 }}">{{ '+' if d > 0 }}{{ "{:,}".format(d) }}</td>
+        <td class="num">{% if r.old_safety is not none and r.old_safety != r.safety %}<s style="color:var(--sub)">{{ r.old_safety }}</s> → {% endif %}{{ r.safety }}</td>
+        <td>{% if r.old_urg and r.old_urg != r.urg %}<s style="color:var(--sub)">{{ r.old_urg }}</s> → {% endif %}{{ r.urg }}</td>
+      </tr>
+      {% if r.status != '변경없음' %}
+        <input type="hidden" name="name" value="{{ r.name }}"><input type="hidden" name="maker" value="{{ r.maker }}">
+        <input type="hidden" name="loc" value="{{ r.loc }}"><input type="hidden" name="qty" value="{{ r.qty }}">
+        <input type="hidden" name="safety" value="{{ r.safety }}"><input type="hidden" name="urg" value="{{ r.urg }}">
+      {% endif %}
+      {% endfor %}
+    </table></div>
+  </form>
+{% endif %}
+{% endblock %}
+{% block script %}
+<script>
+const drop = document.getElementById('drop'), file = document.getElementById('file');
+file.addEventListener('change', () => file.files.length && document.getElementById('upForm').submit());
+['dragover','dragenter'].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.add('over'); }));
+['dragleave','drop'].forEach(e => drop.addEventListener(e, () => drop.classList.remove('over')));
+drop.addEventListener('drop', ev => { ev.preventDefault(); file.files = ev.dataTransfer.files; file.dispatchEvent(new Event('change')); });
+</script>
+{% endblock %}

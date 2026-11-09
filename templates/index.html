@@ -1,0 +1,626 @@
+{% extends "base.html" %}
+{% block head %}
+<style>
+  .toolbar { display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; }
+  /* 정렬 버튼: 누르면 정렬, 같은 버튼을 다시 누르면 반대 순서 */
+  .sorts { display:flex; gap:6px; margin:-6px 0 12px; overflow-x:auto; scrollbar-width:none; }
+  .sorts::-webkit-scrollbar { display:none; }
+  .sorts button { flex:0 0 auto; border:1px solid var(--line); background:#fff; color:var(--sub); border-radius:999px; padding:7px 14px; white-space:nowrap; font:inherit; font-size:14px; font-weight:700; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .mkdrop { display:none; background:#fff; border:1px solid var(--line); border-radius:12px; box-shadow:0 10px 24px rgba(0,0,0,.10); margin:-4px 0 12px; overflow:hidden; }
+  .mkdrop.show { display:block; }
+  .mkdrop div { display:flex; justify-content:space-between; align-items:center; padding:12px 14px; border-bottom:1px solid var(--line); cursor:pointer; font-weight:700; -webkit-tap-highlight-color:transparent; }
+  .mkdrop div:last-child { border-bottom:0; } .mkdrop div:hover, .mkdrop div.on { background:#eef2ff; color:var(--brand); }
+  .mkdrop small { color:var(--sub); font-weight:600; }
+  .mlist .mth { width:44px; height:44px; border-radius:8px; object-fit:cover; background:#f2f4f7; display:flex; align-items:center; justify-content:center; font-size:16px; color:#98a2b3; }
+  .sorts button.on { background:#eef2ff; border-color:#c7d2fe; color:var(--brand); }
+  @media (max-width:760px) { .toolbar .xls { display:none; } .sorts button { flex:1 1 0; min-width:0; padding:7px 2px; font-size:13px; overflow:hidden; text-overflow:ellipsis; } }  /* 휴대폰: 엑셀 버튼 숨김, 정렬 버튼은 한 줄에 */
+  .search { flex:1; min-width:200px; position:relative; }
+  .search input { padding-left:38px; height:46px; }
+  .search span { position:absolute; left:13px; top:12px; color:var(--sub); }
+  .shortbar { background:#fef3f2; color:#b42318; padding:10px 16px; border-radius:10px; margin-bottom:12px; font-weight:700; }
+  .list .head, .list .row { display:grid; grid-template-columns:64px 2fr 1fr .8fr .8fr .8fr 1.7fr; align-items:center; padding:10px 16px; gap:10px; }
+  .list .head { font-size:13px; color:var(--sub); font-weight:600; border-bottom:1px solid var(--line); }
+  .list .row { border-bottom:1px solid var(--line); cursor:pointer; transition:background .15s; }
+  .list .row:last-child { border-bottom:0; } .list .row:hover { background:#f7f9ff; }
+  .list .row.short { background:#fff5f5; } .list .row.short:hover { background:#ffecec; }
+  .thumb { width:56px; height:56px; border-radius:10px; background:#f1f3f6; object-fit:cover; display:flex; align-items:center; justify-content:center; color:#b0b6c0; font-size:22px; }
+  .pname { font-weight:700; font-size:16px; } .maker { color:var(--brand); font-weight:700; }
+  .maker.link { cursor:pointer; border-radius:6px; padding:1px 3px; margin:-1px -3px; } .maker.link:hover { background:#eef2ff; text-decoration:underline; }
+  .thumb.add { cursor:pointer; border:1.5px dashed #c9cdd4; font-size:20px; } .thumb.add:hover { border-color:var(--brand); color:var(--brand); }
+  .ordchip { display:inline-block; margin-top:4px; padding:2px 8px; border-radius:999px; background:#fff1e6; color:#c2410c; font-size:12px; font-weight:800; }
+  .code { font-family:monospace; font-size:12px; color:var(--sub); display:block; margin-top:2px; }
+  .loc { display:inline-block; background:#f1f3f6; padding:4px 10px; border-radius:6px; font-family:monospace; font-size:14px; }
+  .qty { font-size:20px; font-weight:800; text-align:right; } .qty.zero, .row.short .qty { color:var(--out); }
+  .safety { text-align:right; color:var(--sub); font-weight:700; }
+  .st { display:inline-block; padding:4px 10px; border-radius:999px; font-size:13px; font-weight:800; }
+  .st.ok { background:#ecfdf3; color:#067647; } .st.bad { background:var(--out); color:#fff; }
+  .mood { font-size:22px; line-height:1; display:inline-block; }
+  .urg { display:inline-block; margin-left:4px; font-size:11px; font-weight:800; color:var(--sub); border:1px solid var(--line); border-radius:4px; padding:0 4px; }
+  .acts { display:flex; gap:6px; justify-content:flex-end; } .acts .btn { padding:8px 12px; }
+  .r { text-align:right; } .lbl { display:none; }
+  .empty { padding:40px; text-align:center; color:var(--sub); }
+  @media (max-width:760px) {
+    .list .head { display:none; }
+    .list .row { grid-template-columns:64px 1fr 1fr 1fr; row-gap:8px; padding:12px; }
+    .list .row > .c-photo { grid-row:1 / 3; }
+    .list .row > .c-name { grid-column:2 / 4; grid-row:1; }
+    .list .row > .c-st { grid-column:4; grid-row:1; text-align:right; align-self:start; }
+    .list .row > .c-acts { grid-column:1 / 5; } .acts .btn { flex:1; height:44px; }
+    .lbl { display:block; font-size:12px; color:var(--sub); font-weight:600; }
+    .qty, .safety { text-align:left; }
+  }
+  /* 모달 */
+  .dim { position:fixed; inset:0; background:rgba(15,20,30,.45); display:none; align-items:center; justify-content:center; z-index:50; padding:16px; }
+  .dim.show { display:flex; }
+  .modal { background:#fff; border-radius:18px; width:100%; max-width:460px; padding:24px; max-height:92vh; overflow:auto; }
+  .modal h2 { margin:0; font-size:22px; } .modal .x { float:right; border:0; background:none; font-size:24px; cursor:pointer; color:var(--sub); }
+  .bigphoto { width:100%; max-height:300px; object-fit:contain; background:#f7f8fa; border-radius:12px; margin:14px 0 0; display:block; }
+  .nophoto { display:block; width:100%; border-radius:12px; background:#f7f8fa; border:1.5px dashed #c9cdd4; margin:14px 0 0; padding:34px 16px; text-align:center; color:var(--sub); font-size:15px; font-weight:600; cursor:pointer; }
+  .nophoto:hover { border-color:var(--brand); color:var(--brand); }
+  .nophoto .pick2 { display:flex; gap:8px; margin-top:10px; } .nophoto .btn { flex:1; height:50px; margin:0; color:var(--text); font-size:15px; }
+  .mlist .mrow { display:grid; grid-template-columns:44px 1fr auto auto; gap:10px; align-items:center; padding:12px 6px; border-bottom:1px solid var(--line); cursor:pointer; }
+  .mlist .mrow:hover { background:#f7f9ff; } .mlist .mrow:last-child { border-bottom:0; }
+  .mlist .mh { font-size:12px; color:var(--sub); font-weight:600; cursor:default; } .mlist .mh:hover { background:none; }
+  .mlist .mq { font-weight:800; font-size:17px; text-align:right; min-width:56px; } .mlist .mrow.short .mq { color:var(--out); }
+  .stats { display:grid; grid-template-columns:1fr 1fr 1fr; background:#f7f8fa; border-radius:12px; margin:14px 0; text-align:center; }
+  .stats div { padding:12px 4px; } .stats small { color:var(--sub); font-weight:600; font-size:12px; } .stats b { display:block; font-size:20px; }
+  .stepper { display:flex; align-items:center; border:1px solid var(--line); border-radius:12px; overflow:hidden; margin-bottom:8px; }
+  .stepper button { width:56px; height:52px; border:0; background:#f7f8fa; font-size:22px; cursor:pointer; }
+  .stepper input { border:0; text-align:center; font-size:22px; font-weight:800; border-radius:0; }
+  .quick { display:flex; gap:6px; margin-bottom:14px; } .quick button { flex:1; padding:6px; border:1px solid var(--line); background:#fff; border-radius:8px; cursor:pointer; font-weight:600; color:var(--sub); }
+  .actions { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-top:14px; } .actions .btn { height:54px; font-size:17px; }
+  .actions .btn.pick { outline:3px solid #1d2129; outline-offset:2px; }
+  .field { margin-bottom:10px; }
+  details { margin-top:14px; border-top:1px solid var(--line); padding-top:12px; } summary { cursor:pointer; color:var(--sub); font-weight:600; }
+  .row2 { display:flex; gap:8px; margin-top:10px; align-items:center; } .row2 .btn { white-space:nowrap; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  /* 자동완성 추천 */
+  .sw { position:relative; display:block; flex:1; min-width:0; }
+  .sugg { position:absolute; left:0; right:0; top:100%; margin-top:4px; background:#fff; border:1px solid var(--line); border-radius:10px; box-shadow:0 10px 24px rgba(0,0,0,.12); z-index:80; max-height:220px; overflow:auto; display:none; }
+  .sugg.show { display:block; }
+  .sugg div { padding:11px 12px; cursor:pointer; border-bottom:1px solid var(--line); font-size:15px; -webkit-tap-highlight-color:transparent; }
+  .sugg div:last-child { border-bottom:0; } .sugg div:hover, .sugg div.on { background:#eef2ff; }
+  .sugg b { color:var(--brand); }
+  /* 휴대폰: 제품창 사진은 작게, 재고 수량은 사진 옆에 */
+  @media (max-width:760px) {
+    .pstat { display:flex; gap:10px; margin:14px 0; align-items:stretch; }
+    .pstat #mPhotoBox { flex:0 0 112px; }
+    .pstat .bigphoto { width:112px; height:112px; max-height:none; margin:0; object-fit:cover; }
+    .pstat .nophoto { margin:0; height:112px; padding:10px 6px; font-size:12px; display:flex; align-items:center; justify-content:center; line-height:1.4; word-break:keep-all; }
+    .pstat .stats { flex:1; margin:0; grid-template-columns:1fr; text-align:left; align-content:center; }
+    .pstat .stats div { display:flex; justify-content:space-between; align-items:baseline; padding:5px 12px; }
+    .pstat .stats b { display:inline; font-size:18px; }
+  }
+  /* 카메라 바코드 */
+  /* 상단 오른쪽 SCAN 버튼 (USB 스캐너는 화면 어디서든 그대로 인식) */
+  .scanbtn { margin-left:auto; flex:0 0 auto; border:0; background:var(--brand); color:#fff; border-radius:8px; height:34px; padding:0 12px; font:inherit; font-size:13px; font-weight:800; letter-spacing:.06em; cursor:pointer; }
+  .me + .scanbtn { margin-left:0; } @media (max-width:760px) { .me + .scanbtn { margin-left:auto; } }
+  #camModal .modal { padding:16px; }
+  #camVideo { width:100%; aspect-ratio:4/3; object-fit:cover; background:#000; border-radius:12px; display:block; margin-top:10px; }
+  .camwrap { position:relative; } .camwrap::after { content:''; position:absolute; left:8%; right:8%; top:50%; height:2px; background:#ef4444; box-shadow:0 0 8px #ef4444; }
+</style>
+{% endblock %}
+{% block headright %}<button type="button" class="scanbtn" onclick="camScan()" title="카메라로 바코드 읽기">SCAN</button>
+<input type="file" id="camFile" accept="image/*" capture="environment" hidden onchange="scanPhoto(this)">{% endblock %}
+{% block body %}
+{% if only_short %}
+<h1>재고부족</h1>
+<p class="desc">현재고가 안전재고보다 적은 품목입니다. 주황색 ‘발주’ 버튼으로 발주요청을 남길 수 있습니다.</p>
+{% endif %}
+<div id="liveBar" data-live>{% if short and not only_short %}<div class="shortbar">재고 부족 {{ short }}개 품목 · 목록 맨 위에 표시됩니다. <a href="/shortage" style="color:inherit">재고부족만 보기 →</a></div>{% endif %}</div>
+<div class="toolbar">
+  <div class="search"><span>🔍</span><input id="q" placeholder="제품명, 제조사, 적재위치, 제품코드 검색" autocomplete="off"></div>
+  <button class="btn primary" onclick="openAdd()">＋ 제품 추가</button>
+  <a class="btn xls" href="/download/stock">⬇ 재고 Excel</a>
+</div>
+<div class="sorts" id="sorts">
+  <button data-k="">기본</button><button data-k="name">이름</button><button id="makerBtn" type="button">제조사</button><button data-k="loc">위치</button><button data-k="use">빈도</button><button data-k="qty">재고</button>
+</div>
+<div class="mkdrop" id="mkDrop"></div>
+
+<div class="card list" id="liveList" data-live>
+  <div class="head"><div>사진</div><div>제품명 [제조사]</div><div>적재위치</div><div class="r">현재고</div><div class="r">안전재고</div><div>상태</div><div></div></div>
+  {% for it in items %}
+  <div class="row {{ 'short' if it.short }}" id="row-{{ it.code }}" data-code="{{ it.code }}" data-name="{{ it.name }}" data-maker="{{ it.maker }}" data-loc="{{ it.loc }}"
+       data-use="{{ it.use }}" data-qty="{{ it.qty }}" data-safety="{{ it.safety }}" data-urg="{{ it.urg }}" data-photo="{{ it.photo }}" data-memo="{{ it.memo }}" data-ordered="{{ it.ordered }}" onclick="openItem(this)">
+    <div class="c-photo">{% if it.photo %}<img class="thumb" loading="lazy" src="/photo/{{ it.code }}.jpg?thumb=1&v={{ it.photo }}" alt="">{% else %}<label class="thumb add" title="사진 등록 (촬영/파일선택)" onclick="event.stopPropagation()">📷<input type="file" accept="image/*" hidden onchange="uploadPhoto(this, this.closest('.row'))"></label>{% endif %}</div>
+    <div class="c-name"><span class="pname">{{ it.name }}</span> <span class="maker link" title="{{ it.maker }} 제품 모두 보기" onclick="event.stopPropagation();openMaker(this.closest('.row').dataset.maker)">[{{ it.maker }}]</span><span class="code">{{ it.code }} <span class="urg">긴급도 {{ it.urg }}</span></span></div>
+    <div><span class="lbl">적재위치</span><span class="loc">{{ it.loc }}</span></div>
+    <div class="qty {{ 'zero' if it.qty == 0 }}"><span class="lbl">현재고</span><span class="v">{{ "{:,}".format(it.qty) }}</span></div>
+    <div class="safety"><span class="lbl">안전재고</span><span class="v">{{ "{:,}".format(it.safety) }}</span></div>
+    <div class="c-st"><span class="mood" title="{{ '부족' if it.short else ('안전재고 근접' if it.mood == '🟡' else '정상') }}">{{ it.mood }}</span><br><span class="ordchip" {% if not it.ordered %}style="display:none"{% endif %}>발주중 {{ it.ordered }}</span></div>
+    <div class="c-acts acts">
+      <button class="btn in" onclick="event.stopPropagation();openItem(this.closest('.row'),'입고')">입고</button>
+      <button class="btn out" onclick="event.stopPropagation();openItem(this.closest('.row'),'출고')">출고</button>
+      <button class="btn order" onclick="event.stopPropagation();openItem(this.closest('.row'),'발주')">발주</button>
+    </div>
+  </div>
+  {% else %}
+  <div class="empty">{% if only_short %}재고가 부족한 품목이 없습니다. 👍{% else %}등록된 제품이 없습니다. ‘＋ 제품 추가’ 또는 ‘엑셀 일괄입력’으로 시작하세요.{% endif %}</div>
+  {% endfor %}
+  <div class="empty" id="noResult" style="display:none">검색 결과가 없습니다.</div>
+  <script type="application/json" id="allData">{{ all_items|tojson }}</script>
+</div>
+<p class="desc" style="margin-top:12px">💡 제품을 누르거나 바코드를 스캔하면 입고 · 출고 · 발주를 처리할 수 있습니다. 제조사 이름을 누르면 그 제조사 제품만 모아 봅니다. 모든 변경은 Excel 로그에 기록됩니다.</p>
+
+<!-- 입고/출고 모달 -->
+<div class="dim" id="itemModal" onclick="if(event.target===this)closeM()">
+  <div class="modal">
+    <button class="x" onclick="closeM()">×</button>
+    <h2><span id="mName"></span> <span class="maker link" id="mMaker" onclick="openMaker(cur.dataset.maker)"></span></h2>
+    <div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <span class="code" id="mCode" style="margin:0"></span> · 적재위치 <span class="loc" id="mLoc"></span>
+      <a class="btn" id="mLabel" target="_blank" style="padding:4px 10px;font-size:13px">▥ 라벨 인쇄</a>
+    </div>
+    <div class="pstat"><div id="mPhotoBox"></div>
+    <div class="stats"><div><small>현재고</small><b id="mQty"></b></div><div><small>안전재고</small><b id="mSafety"></b></div><div><small>상태</small><b id="mSt"></b></div></div></div>
+    <div id="mOrdered" style="display:none;margin:-6px 0 12px;color:#c2410c;font-weight:700;font-size:14px"></div>
+    <label>수량 (입고 · 출고 · 발주 공통)</label>
+    <div class="stepper">
+      <button type="button" onclick="step(-1)">−</button>
+      <input id="mAmt" type="number" min="1" value="1" inputmode="numeric">
+      <button type="button" onclick="step(1)">＋</button>
+    </div>
+    <div class="quick"><button onclick="step(10)">+10</button><button onclick="step(50)">+50</button><button onclick="step(100)">+100</button><button onclick="setAmt(1)">초기화</button></div>
+    <div class="grid2">
+      <div class="field"><label>담당자</label><input name="worker" id="mWorker" placeholder="이름"></div>
+      <div class="field"><label>비고 <span id="memoSt" style="font-weight:600;font-size:12px"></span></label><input id="mMemo" placeholder="제품 메모 (자동 저장)" maxlength="500" autocomplete="off"></div>
+    </div>
+    <div class="actions">
+      <button class="btn in" id="bIn" onclick="move('입고')">입고</button>
+      <button class="btn out" id="bOut" onclick="move('출고')">출고</button>
+      <button class="btn order" id="bOrd" onclick="order()">발주</button>
+    </div>
+    <details id="dCrit">
+      <summary>기준수정 (안전재고 · 긴급도)</summary>
+      <div class="row2">
+        <input id="mNewSafety" type="number" min="0" inputmode="numeric" placeholder="안전재고">
+        <select id="mNewUrg" style="width:110px"><option value="A">긴급도 A</option><option value="B">긴급도 B</option><option value="C">긴급도 C</option></select>
+        <button class="btn" onclick="changeCrit()">저장</button>
+      </div>
+    </details>
+    <details>
+      <summary>사진 등록 · 변경</summary>
+      <div class="row2">
+        <label class="btn" style="margin:0;flex:1;color:var(--text);font-size:15px">📷 사진 촬영<input type="file" accept="image/*" capture="environment" hidden onchange="uploadPhoto(this)"></label>
+        <label class="btn" style="margin:0;flex:1;color:var(--text);font-size:15px">🖼 파일 선택<input type="file" accept="image/*" hidden onchange="uploadPhoto(this)"></label>
+      </div>
+      <button class="btn" id="bDelPhoto" style="width:100%;margin-top:8px;color:var(--out);border-color:#fecdca" onclick="deletePhoto()">🗑 사진 삭제</button>
+    </details>
+    <details>
+      <summary>제품명 · 제조사 수정</summary>
+      <div class="row2"><input id="mNewName" placeholder="제품명" autocomplete="off"><input id="mNewMaker" placeholder="제조사" autocomplete="off"><button class="btn" onclick="changeInfo()">저장</button></div>
+    </details>
+    <details>
+      <summary>적재위치 변경</summary>
+      <div class="row2"><input id="mNewLoc" placeholder="새 적재위치"><button class="btn" onclick="changeLoc()">변경</button></div>
+    </details>
+  </div>
+</div>
+
+<!-- 카메라 바코드 읽기 -->
+<div class="dim" id="camModal" onclick="if(event.target===this)closeM()">
+  <div class="modal">
+    <button class="x" onclick="closeM()">×</button>
+    <h2>바코드 읽기</h2>
+    <p class="desc" style="margin:4px 0 0">빨간 선에 바코드를 가로로 맞춰 주세요.</p>
+    <div class="camwrap"><video id="camVideo" playsinline muted></video></div>
+  </div>
+</div>
+
+<!-- 제조사별 제품 목록 -->
+<div class="dim" id="makerModal" onclick="if(event.target===this)closeM()">
+  <div class="modal">
+    <button class="x" onclick="closeM()">×</button>
+    <h2><span class="maker" id="mkTitle"></span> 제품</h2>
+    <p class="desc" style="margin:6px 0 8px" id="mkDesc"></p>
+    <div class="mlist" id="mkList"></div>
+  </div>
+</div>
+
+<!-- 제품 추가 모달 -->
+<div class="dim" id="addModal" onclick="if(event.target===this)closeM()">
+  <form class="modal" method="post" action="/add">
+    <button type="button" class="x" onclick="closeM()">×</button>
+    <h2>제품 추가</h2>
+    <p class="desc">새 제품을 한 개씩 등록합니다. 제품코드(P00001…)는 자동으로 붙습니다. 사진은 추가 후 제품을 눌러 등록하세요.</p>
+    <div class="grid2">
+      <div class="field"><label>제품명 *</label><input name="name" id="addName" required autocomplete="off"></div>
+      <div class="field"><label>제조사 *</label><input name="maker" id="addMaker" required placeholder="예: Molex" autocomplete="off"></div>
+      <div class="field"><label>적재위치 *</label><input name="loc" required placeholder="예: A-01-03"></div>
+      <div class="field"><label>초기 수량</label><input name="qty" type="number" min="0" value="0"></div>
+      <div class="field"><label>안전재고</label><input name="safety" type="number" min="0" placeholder="비우면 기본값"></div>
+      <div class="field"><label>긴급도</label><select name="urg"><option value="">기본값</option><option>A</option><option>B</option><option>C</option></select></div>
+    </div>
+    <div class="field"><label>담당자</label><input name="worker" placeholder="이름"></div>
+    <button class="btn primary" style="width:100%;height:50px;margin-top:8px">추가하기</button>
+  </form>
+</div>
+{% endblock %}
+{% block script %}
+<script src="/static/zxing.min.js?v=0.21.3" defer></script>
+<script>
+let cur = null;
+const ALL = JSON.parse($id('allData').textContent);
+function $id(i) { return document.getElementById(i); }
+const fmt = n => Number(n).toLocaleString('ko-KR');
+const $ = id => document.getElementById(id);
+const touch = matchMedia('(pointer:coarse)').matches;
+const modalOpen = () => !!document.querySelector('.dim.show');
+
+function applySearch() {
+  const q = $('q').value.trim().toLowerCase(); let shown = 0;
+  document.querySelectorAll('.list .row').forEach(r => {
+    const hit = (r.dataset.name + ' ' + r.dataset.maker + ' ' + r.dataset.loc + ' ' + r.dataset.code).toLowerCase().includes(q)
+      && (!makerF || r.dataset.maker.toLowerCase() === makerF.toLowerCase());
+    r.style.display = hit ? '' : 'none'; if (hit) shown++;
+  });
+  $('noResult').style.display = shown || !document.querySelector('.list .row') ? 'none' : '';
+}
+$('q').addEventListener('input', applySearch);
+// 제조사 버튼: 누르면 아래로 제조사 목록, 고르면 그 제조사 제품만 보기
+let makerF = '';
+function makerList() {
+  const m = new Map();
+  ALL.forEach(i => { const k = i.maker.toLowerCase(); const v = m.get(k) || { name:i.maker, n:0 }; v.n++; m.set(k, v); });
+  return [...m.values()].sort((a, b) => ko(a.name, b.name));
+}
+function toggleMakerDrop(force) {
+  const d = $('mkDrop'), open = force !== undefined ? force : !d.classList.contains('show');
+  if (open) d.innerHTML = '<div data-m=""' + (makerF ? '' : ' class="on"') + '>전체 제조사 <small>' + ALL.length + '개</small></div>'
+    + makerList().map(m => '<div data-m="' + esc(m.name) + '"' + (m.name.toLowerCase() === makerF.toLowerCase() ? ' class="on"' : '') + '>' + esc(m.name) + ' <small>' + m.n + '개</small></div>').join('');
+  d.classList.toggle('show', open);
+}
+function setMaker(m) {
+  makerF = m; toggleMakerDrop(false);
+  $('makerBtn').textContent = m ? m + ' ✕' : '제조사'; $('makerBtn').classList.toggle('on', !!m);
+  applySearch();
+}
+$('makerBtn').onclick = e => { e.stopPropagation(); toggleMakerDrop(); };
+$('mkDrop').addEventListener('click', e => { const d = e.target.closest('div[data-m]'); if (d) setMaker(d.dataset.m); });
+document.addEventListener('click', e => { if (!e.target.closest('#mkDrop, #makerBtn')) toggleMakerDrop(false); });
+// 새 목록이 들어오면: 제품 데이터 갱신, 검색어 다시 적용, 열린 제품창은 새 줄과 연결
+window.onLive = () => {
+  ALL.splice(0, ALL.length, ...JSON.parse($('allData').textContent));
+  markOrder(); applySort(); applySearch();
+  if (cur) { const r = document.querySelector('.list .row[data-code="' + CSS.escape(cur.dataset.code) + '"]'); if (r) { cur = r; if ($('itemModal').classList.contains('show')) fill(r); } }
+};
+
+// ---- 정렬 (기본 / 가나다 / 제조사 / 위치 / 사용빈도 / 재고 적은순). 고른 정렬은 이 기기에 기억
+const SORT_KEY = 'wh_sort';
+const ko = (a, b) => String(a).localeCompare(String(b), 'ko', { numeric:true, sensitivity:'base' });
+// 처음 누를 때 방향: 이름·제조사·위치는 ABC/123순, 빈도·재고는 많은순. 다시 누르면 반대
+const FIRST_DIR = { name:1, maker:1, loc:1, use:-1, qty:-1 };
+const SORTS = {
+  name:  (a, b) => ko(a.dataset.name, b.dataset.name) || ko(a.dataset.maker, b.dataset.maker),
+  maker: (a, b) => ko(a.dataset.maker, b.dataset.maker) || ko(a.dataset.name, b.dataset.name),
+  loc:   (a, b) => ko(a.dataset.loc, b.dataset.loc) || ko(a.dataset.name, b.dataset.name),
+  use:   (a, b) => (a.dataset.use - b.dataset.use),
+  qty:   (a, b) => (a.dataset.qty - b.dataset.qty),
+};
+let sortK = '', sortDir = 1;
+function applySort() {
+  const list = document.querySelector('.list'); if (!list) return;
+  const rows = [...list.querySelectorAll(':scope > .row')];
+  if (sortK && SORTS[sortK]) rows.sort((a, b) => sortDir * SORTS[sortK](a, b) || ko(a.dataset.name, b.dataset.name));
+  else rows.sort((a, b) => a.dataset.i - b.dataset.i);  // 기본 = 부족 먼저 (서버 순서)
+  const anchor = list.querySelector('.empty'); rows.forEach(r => list.insertBefore(r, anchor));
+  document.querySelectorAll('#sorts button[data-k]').forEach(btn => {
+    const on = btn.dataset.k === sortK; btn.classList.toggle('on', on);
+    if (!btn.dataset.t) btn.dataset.t = btn.textContent;
+    btn.textContent = btn.dataset.t + (on && sortK ? (sortDir > 0 ? ' ▲' : ' ▼') : '');
+  });
+}
+document.querySelectorAll('#sorts button[data-k]').forEach(btn => btn.onclick = () => {
+  const k = btn.dataset.k;
+  if (k && k === sortK) sortDir = -sortDir; else { sortK = k; sortDir = FIRST_DIR[k] || 1; }
+  try { localStorage.setItem(SORT_KEY, sortK + ':' + sortDir); } catch (e) {}
+  applySort();
+});
+function markOrder() { document.querySelectorAll('.list > .row').forEach((r, i) => r.dataset.i = i); }
+try { const v = (localStorage.getItem(SORT_KEY) || '').split(':'); if (SORTS[v[0]]) { sortK = v[0]; sortDir = v[1] ? (Number(v[1]) === -1 ? -1 : 1) : FIRST_DIR[v[0]]; } } catch (e) {}
+markOrder(); applySort();
+
+// ---- 바코드 스캔 (USB 스캐너는 키보드처럼 입력 + Enter) ----
+function openByCode(raw) {
+  const code = raw.trim().toUpperCase(); if (!code) return;
+  const r = document.querySelector('.list .row[data-code="' + CSS.escape(code) + '"]');
+  if (!r) return toast('제품코드 ' + code + ' 을(를) 찾을 수 없습니다.', true);
+  closeM(); openItem(r);
+}
+// 다른 곳에 커서가 없을 때 스캐너 입력을 받아서 처리
+let buf = '', bufT = 0;
+document.addEventListener('keydown', e => {
+  const a = document.activeElement;
+  // 수량 칸(숫자)에 커서가 있어도 'P…'로 시작하는 스캔은 받아서 다른 제품으로 전환
+  const amt = a && a.id === 'mAmt' && (buf || /^[a-zA-Z]$/.test(e.key));
+  if (a && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName) && !amt) return;
+  if (amt && e.key.length === 1) e.preventDefault();
+  if (e.ctrlKey || e.altKey || e.metaKey) return;
+  const t = Date.now(); if (t - bufT > 300) buf = ''; bufT = t;
+  if (e.key === 'Enter') { if (buf.length >= 3) { e.preventDefault(); openByCode(buf); } buf = ''; return; }
+  if (e.key.length === 1) buf += e.key;
+});
+function focusScan() { const a = document.activeElement; if (!touch && !modalOpen() && a && a !== document.body && a.closest('.modal')) a.blur(); }  // 창을 닫으면 커서를 빼서 USB 스캐너 입력을 바로 받음
+focusScan();
+
+// 상태 이모지: 부족 🔴 / 안전재고 근접(안전재고 ~ 120% 미만) 🟡 / 정상 🟢
+function mood(q, s) { q = Number(q); s = Number(s); return q < s ? '🔴' : (s > 0 && q < s * 1.2 ? '🟡' : '🟢'); }
+function moodName(q, s) { return { '🔴':'부족', '🟡':'안전재고 근접', '🟢':'정상' }[mood(q, s)]; }
+function status(r) { return Number(r.dataset.qty) < Number(r.dataset.safety); }
+function photoHtml(r, big) {
+  const v = r.dataset.photo;
+  if (big) return v !== '0' ? '<img class="bigphoto" src="/photo/' + r.dataset.code + '.jpg?v=' + v + '" alt="">'
+    : '<label class="nophoto">📷 사진 없음 · 눌러서 촬영 또는 파일선택<input type="file" accept="image/*" hidden onchange="uploadPhoto(this)"></label>';
+  return v !== '0' ? '<img class="thumb" src="/photo/' + r.dataset.code + '.jpg?thumb=1&v=' + v + '" alt="">'
+    : '<label class="thumb add" title="사진 등록 (촬영/파일선택)" onclick="event.stopPropagation()">📷<input type="file" accept="image/*" hidden onchange="uploadPhoto(this, this.closest(\'.row\'))"></label>';
+}
+function fill(r) {
+  $('mName').textContent = r.dataset.name; $('mMaker').textContent = '[' + r.dataset.maker + ']';
+  $('mCode').textContent = r.dataset.code; $('mLabel').href = '/label/' + r.dataset.code;
+  $('mLoc').textContent = r.dataset.loc; $('mQty').textContent = fmt(r.dataset.qty);
+  $('mSafety').textContent = fmt(r.dataset.safety);
+  $('mSt').textContent = mood(r.dataset.qty, r.dataset.safety); $('mSt').style.color = '';
+  $('mPhotoBox').innerHTML = photoHtml(r, true);
+  $('bDelPhoto').style.display = r.dataset.photo !== '0' ? '' : 'none';
+  const o = Number(r.dataset.ordered || 0);
+  $('mOrdered').style.display = o ? '' : 'none'; $('mOrdered').textContent = '🟠 발주요청 진행중 ' + fmt(o) + '개';
+}
+function openItem(r, kind, photo) {
+  closeM(true);
+  cur = r; fill(r); $('mMemo').value = r.dataset.memo || ''; $('memoSt').textContent = ''; $('mNewLoc').value = '';
+  // 발주로 열면 부족분(안전재고 - 현재고)을 기본 수량으로 제안
+  const need = Number(r.dataset.safety) - Number(r.dataset.qty);
+  setAmt(kind === '발주' && need > 0 ? need : 1);
+  $('mNewSafety').value = r.dataset.safety; $('mNewUrg').value = r.dataset.urg;
+  $('mNewName').value = r.dataset.name; $('mNewMaker').value = r.dataset.maker;
+  $('bIn').classList.toggle('pick', kind === '입고'); $('bOut').classList.toggle('pick', kind === '출고'); $('bOrd').classList.toggle('pick', kind === '발주');
+  document.querySelectorAll('#itemModal details').forEach(d => d.open = false);
+  $('itemModal').classList.add('show');
+  if (photo) { $('mPhotoBox').scrollIntoView({ block:'center' }); return; }
+  if (!touch) { $('mAmt').focus(); $('mAmt').select(); }
+}
+// 제조사 글씨 클릭 → 그 제조사 제품 목록 (모델명 · 적재위치 · 현재고). 제품을 누르면 재고입력 창
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function openMaker(maker) {
+  const list = ALL.filter(i => i.maker.toLowerCase() === String(maker).toLowerCase());
+  closeM(true);
+  $('mkTitle').textContent = '[' + maker + ']';
+  $('mkDesc').textContent = '총 ' + list.length + '개 품목 · 제품을 누르면 입고 · 출고 · 발주 화면이 열립니다.';
+  $('mkList').innerHTML = '<div class="mrow mh"><div></div><div>모델명 (제품코드)</div><div>적재위치</div><div class="r">현재고</div></div>'
+    + list.map(i => '<div class="mrow' + (i.short ? ' short' : '') + '" onclick="openFromMaker(\'' + esc(i.code) + '\')">'
+      + (i.photo ? '<img class="mth" loading="lazy" src="/photo/' + esc(i.code) + '.jpg?thumb=1&v=' + esc(i.photo) + '" alt="">' : '<div class="mth">📷</div>')
+      + '<div><span class="pname">' + esc(i.name) + '</span>' + ' <span style="font-size:16px">' + mood(i.qty, i.safety) + '</span>'
+      + '<span class="code">' + esc(i.code) + '</span></div>'
+      + '<div><span class="loc">' + esc(i.loc) + '</span></div><div class="mq">' + fmt(i.qty) + '</div></div>').join('');
+  $('makerModal').classList.add('show');
+}
+function openFromMaker(code) {
+  const r = document.querySelector('.list .row[data-code="' + CSS.escape(code) + '"]');
+  if (r) openItem(r); else location.href = '/?open=' + encodeURIComponent(code);  // 재고부족 화면에 없는 제품은 재고현황에서 열기
+}
+{ const c = new URLSearchParams(location.search).get('open');
+  if (c) { const r = document.querySelector('.list .row[data-code="' + CSS.escape(c) + '"]'); if (r) openItem(r); history.replaceState(null, '', location.pathname); } }
+function openAdd() { $('addModal').classList.add('show'); }
+function closeM(keep) { camStop(); flushMemo(); document.querySelectorAll('.dim').forEach(d => d.classList.remove('show')); if (!keep) focusScan(); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeM(); });
+function setAmt(v) { $('mAmt').value = v; }
+function step(d) { setAmt(Math.max(1, (parseInt($('mAmt').value) || 0) + d)); }
+
+function update(item) {
+  const r = cur;
+  Object.assign(r.dataset, { name:item.name, maker:item.maker, qty:item.qty, loc:item.loc, safety:item.safety, urg:item.urg, photo:item.photo, ordered:item.ordered, memo:item.memo || '' });
+  const a = ALL.find(i => i.code === item.code); if (a) Object.assign(a, item);
+  const oc = r.querySelector('.ordchip'); oc.style.display = item.ordered ? '' : 'none'; oc.textContent = '발주중 ' + fmt(item.ordered);
+  r.querySelector('.pname').textContent = item.name; r.querySelector('.maker').textContent = '[' + item.maker + ']';
+  r.querySelector('.qty .v').textContent = fmt(item.qty); r.querySelector('.qty').classList.toggle('zero', item.qty === 0);
+  r.querySelector('.safety .v').textContent = fmt(item.safety);
+  r.querySelector('.loc').textContent = item.loc;
+  r.querySelector('.urg').textContent = '긴급도 ' + item.urg;
+  r.classList.toggle('short', item.short);
+  const st = r.querySelector('.mood'); st.textContent = mood(item.qty, item.safety); st.title = moodName(item.qty, item.safety);
+  r.querySelector('.c-photo').innerHTML = photoHtml(r, false);
+  fill(r);
+}
+
+async function post(url, body) {
+  setWorker($('mWorker').value);
+  const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+  const d = await res.json().catch(() => ({ ok:false, msg:'서버가 예전 버전입니다. 서버를 다시 켜 주세요. (' + res.status + ')' }));
+  if (d.ok) { update(d.item); toast(d.msg); liveRefresh(); } else toast(d.msg, true);
+  return d;
+}
+async function move(kind) {
+  const qty = parseInt($('mAmt').value);
+  if (!qty || qty < 1) return toast('수량을 1 이상으로 입력해 주세요.', true);
+  const btns = document.querySelectorAll('.actions .btn'); btns.forEach(b => b.disabled = true);
+  try {
+    const d = await post('/api/move', { kind, qty, code:cur.dataset.code, worker:$('mWorker').value, memo:'' });
+    if (d.ok) closeM();
+  } finally { btns.forEach(b => b.disabled = false); }
+}
+async function order() {
+  const qty = parseInt($('mAmt').value);
+  if (!qty || qty < 1) return toast('발주 수량을 1 이상으로 입력해 주세요.', true);
+  if (!confirm(cur.dataset.name + ' [' + cur.dataset.maker + ']\n발주요청 ' + fmt(qty) + '개를 등록할까요?')) return;
+  const btns = document.querySelectorAll('.actions .btn'); btns.forEach(b => b.disabled = true);
+  try {
+    const d = await post('/api/order', { qty, code:cur.dataset.code, worker:$('mWorker').value, memo:'' });
+    if (d.ok) closeM();
+  } finally { btns.forEach(b => b.disabled = false); }
+}
+function bumpNav(a) {
+  let c = a.querySelector('.cnt'); if (!c) { c = document.createElement('span'); c.className = 'cnt o'; c.textContent = '0'; a.appendChild(c); }
+  c.textContent = Number(c.textContent) + 1;
+}
+// 제품 비고: 적으면 0.7초 뒤 자동 저장, 창을 닫거나 다른 칸으로 옮겨도 저장
+let memoT = null;
+function memoSt(t, err) { $('memoSt').textContent = t; $('memoSt').style.color = err ? 'var(--out)' : 'var(--ok)'; }
+async function saveMemo() {
+  clearTimeout(memoT); memoT = null;
+  if (!cur) return;
+  const r = cur, memo = $('mMemo').value.trim();
+  if (memo === (r.dataset.memo || '')) return;
+  r.dataset.memo = memo; memoSt('저장 중…');
+  try {
+    const res = await fetch('/api/memo', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ code:r.dataset.code, memo }) });
+    const d = await res.json().catch(() => ({ ok:false, msg:'서버가 예전 버전입니다. 서버를 다시 켜 주세요. (' + res.status + ')' }));
+    if (!d.ok) { r.dataset.memo = ''; memoSt(''); return toast(d.msg, true); }
+    const a = ALL.find(i => i.code === r.dataset.code); if (a) a.memo = memo;
+    if (cur === r && $('itemModal').classList.contains('show')) memoSt('✓ 저장됨');
+  } catch (e) { r.dataset.memo = ''; memoSt('저장 실패', true); }
+}
+function flushMemo() { if (memoT || (cur && $('itemModal').classList.contains('show') && $('mMemo').value.trim() !== (cur.dataset.memo || ''))) saveMemo(); }
+$('mMemo').addEventListener('input', () => { memoSt(''); clearTimeout(memoT); memoT = setTimeout(saveMemo, 700); });
+$('mMemo').addEventListener('blur', () => { if (memoT) saveMemo(); });
+async function deletePhoto() {
+  if (!confirm(cur.dataset.name + ' [' + cur.dataset.maker + '] 사진을 삭제할까요?\n삭제하면 되돌릴 수 없습니다.')) return;
+  await post('/api/photo/' + cur.dataset.code + '/delete', { worker:$('mWorker').value });
+}
+// ---- 자동완성: 기존에 등록된 제품명/제조사에서 추천 (클릭하면 입력, 직접 입력도 가능) ----
+const norm = v => String(v).toLowerCase().replace(/[\s\-_.\/]/g, '');
+function suggestList(field) { return [...new Set(ALL.map(i => i[field]).filter(Boolean))]; }
+function attachSuggest(input, field) {
+  const wrap = document.createElement('span'); wrap.className = 'sw';
+  input.parentNode.insertBefore(wrap, input); wrap.appendChild(input);
+  const box = document.createElement('div'); box.className = 'sugg'; wrap.appendChild(box);
+  let idx = -1;
+  const render = () => {
+    const q = norm(input.value);
+    if (!q) { box.classList.remove('show'); return; }
+    const hits = suggestList(field).filter(v => norm(v).includes(q) && v !== input.value)
+      .sort((a, b) => (norm(b).startsWith(q) - norm(a).startsWith(q)) || a.localeCompare(b)).slice(0, 8);
+    idx = -1;
+    if (!hits.length) { box.classList.remove('show'); return; }
+    box.innerHTML = hits.map(v => {
+      const n = v.toLowerCase().indexOf(input.value.trim().toLowerCase());
+      const t = input.value.trim();
+      return '<div data-v="' + esc(v) + '">' + (n >= 0 && t ? esc(v.slice(0, n)) + '<b>' + esc(v.slice(n, n + t.length)) + '</b>' + esc(v.slice(n + t.length)) : esc(v)) + '</div>';
+    }).join('');
+    box.classList.add('show');
+  };
+  const pick = v => { input.value = v; box.classList.remove('show'); input.dispatchEvent(new Event('change')); };
+  box.addEventListener('pointerdown', e => { const d = e.target.closest('div[data-v]'); if (d) { e.preventDefault(); pick(d.dataset.v); } });
+  input.addEventListener('input', render);
+  input.addEventListener('focus', render);
+  input.addEventListener('blur', () => setTimeout(() => box.classList.remove('show'), 150));
+  input.addEventListener('keydown', e => {
+    const items = [...box.querySelectorAll('div[data-v]')];
+    if (!box.classList.contains('show') || !items.length) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault(); idx = (idx + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+      items.forEach((d, i) => d.classList.toggle('on', i === idx));
+    } else if (e.key === 'Enter' && idx >= 0) { e.preventDefault(); pick(items[idx].dataset.v); }
+    else if (e.key === 'Escape') { e.stopPropagation(); box.classList.remove('show'); }
+  });
+}
+attachSuggest($('mNewName'), 'name'); attachSuggest($('mNewMaker'), 'maker');
+attachSuggest($('addName'), 'name'); attachSuggest($('addMaker'), 'maker');
+
+async function changeInfo() {
+  const name = $('mNewName').value.trim(), maker = $('mNewMaker').value.trim();
+  if (!name || !maker) return toast('제품명과 제조사를 모두 입력해 주세요.', true);
+  if (name === cur.dataset.name && maker === cur.dataset.maker) return toast('변경된 내용이 없습니다.');
+  if (!confirm(cur.dataset.name + ' [' + cur.dataset.maker + ']\n→ ' + name + ' [' + maker + ']\n\n이렇게 수정할까요?')) return;
+  await post('/api/rename', { name, maker, code:cur.dataset.code, worker:$('mWorker').value });
+}
+async function changeLoc() {
+  const loc = $('mNewLoc').value.trim(); if (!loc) return toast('새 적재위치를 입력해 주세요.', true);
+  await post('/api/location', { loc, code:cur.dataset.code, worker:$('mWorker').value });
+}
+async function changeCrit() {
+  const safety = parseInt($('mNewSafety').value);
+  if (isNaN(safety) || safety < 0) return toast('안전재고는 0 이상의 숫자로 입력해 주세요.', true);
+  await post('/api/criteria', { safety, urg:$('mNewUrg').value, code:cur.dataset.code, worker:$('mWorker').value });
+}
+async function uploadPhoto(input, row) {
+  if (!input.files.length) return;
+  if (row) cur = row;  // 목록의 📷에서 바로 올리는 경우
+  const fd = new FormData(); fd.append('photo', input.files[0]); fd.append('worker', $('mWorker').value);
+  toast('사진 올리는 중…');
+  try {
+    const res = await fetch('/api/photo/' + cur.dataset.code, { method:'POST', body:fd });
+    const d = await res.json().catch(() => ({ ok:false, msg:'사진이 너무 크거나 올리지 못했습니다.' }));
+    if (d.ok) { update(d.item); toast(d.msg); liveRefresh(); } else toast(d.msg, true);
+  } catch (e) { toast('사진을 올리지 못했습니다. 연결을 확인해 주세요.', true); }
+  input.value = '';
+}
+// ---- 휴대폰 카메라로 바코드 읽기 ----
+// https(또는 localhost)이면 실시간 카메라, http 주소면 사진을 찍어서 읽음 (브라우저 보안 규칙)
+let camReader = null;
+function zxReader() {
+  const Z = window.ZXing; if (!Z) return null;
+  const hints = new Map();
+  hints.set(Z.DecodeHintType.POSSIBLE_FORMATS, [Z.BarcodeFormat.CODE_128, Z.BarcodeFormat.CODE_39, Z.BarcodeFormat.QR_CODE, Z.BarcodeFormat.EAN_13]);
+  hints.set(Z.DecodeHintType.TRY_HARDER, true);
+  return new Z.BrowserMultiFormatReader(hints);
+}
+function camFound(text) { camStop(); closeM(true); if (navigator.vibrate) navigator.vibrate(80); openByCode(text); }
+async function camScan() {
+  if (!window.ZXing) return toast('바코드 읽기 준비 중입니다. 잠시 후 다시 눌러 주세요.', true);
+  if (!(window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) { $('camFile').click(); return; }
+  closeM(true); $('camModal').classList.add('show');
+  try {
+    camReader = zxReader();
+    await camReader.decodeFromConstraints({ video:{ facingMode:'environment' } }, $('camVideo'), (res) => { if (res) camFound(res.getText()); });
+  } catch (e) { camStop(); closeM(true); $('camFile').click(); }  // 카메라 권한 거부 등 → 사진 찍기로
+}
+function camStop() { if (camReader) { try { camReader.reset(); } catch (e) {} camReader = null; } }
+// 사진 한 장에서 바코드를 모두 찾기 (전체 + 겹치는 조각들, 가로/세로). 우리 제품코드만 남겨서
+// 1개면 바로 열고, 여러 개면 목록에서 고르게 함
+async function scanPhoto(input) {
+  const f = input.files[0]; input.value = ''; if (!f) return;
+  if (!window.ZXing) return toast('바코드 읽기 준비 중입니다. 잠시 후 다시 시도해 주세요.', true);
+  toast('바코드 읽는 중…');
+  const img = new Image(); img.src = URL.createObjectURL(f);
+  try { await img.decode(); } catch (e) { return toast('사진을 열지 못했습니다.', true); }
+  await new Promise(r => setTimeout(r, 30));  // '읽는 중' 표시가 먼저 보이도록
+  const reader = zxReader(), found = new Set();
+  const decode = c => { try { found.add(reader.decodeBitmap(new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(new ZXing.HTMLCanvasElementLuminanceSource(c)))).getText().trim().toUpperCase()); } catch (e) {} reader.reset(); };
+  const draw = (max, rot) => {
+    const sc = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+    const w = Math.round(img.naturalWidth * sc), h = Math.round(img.naturalHeight * sc);
+    const c = document.createElement('canvas'); c.width = rot ? h : w; c.height = rot ? w : h;
+    const g = c.getContext('2d'); if (rot) { g.translate(h, 0); g.rotate(Math.PI / 2); } g.drawImage(img, 0, 0, w, h);
+    return c;
+  };
+  const tiles = (c, cols, rows) => {  // 50% 겹치게 조각내서 각각 읽기
+    const tw = c.width / cols * 1.5, th = c.height / rows * 1.5;
+    for (let y = 0; y <= rows * 2 - 2; y++) for (let x = 0; x <= cols * 2 - 2; x++) {
+      const sx = Math.min(c.width - tw, x * c.width / cols / 2 * (cols > 1 ? 1 : 0)), sy = Math.min(c.height - th, y * c.height / rows / 2);
+      const t = document.createElement('canvas'); t.width = Math.max(1, Math.round(Math.min(tw, c.width))); t.height = Math.max(1, Math.round(Math.min(th, c.height)));
+      t.getContext('2d').drawImage(c, Math.max(0, sx), Math.max(0, sy), t.width, t.height, 0, 0, t.width, t.height);
+      decode(t);
+    }
+  };
+  for (const rot of [false, true]) {
+    if (rot && found.size) break;  // 가로로 읽힌 게 있으면 세로 회전은 건너뜀 (속도)
+    const big = draw(1800, rot);
+    decode(draw(1280, rot)); decode(big);
+    tiles(big, 1, 4); tiles(big, 2, 3);
+  }
+  URL.revokeObjectURL(img.src);
+  const codes = new Set(ALL.map(i => i.code.toUpperCase()));
+  const mine = [...found].filter(t => codes.has(t)), other = [...found].filter(t => !codes.has(t));
+  $('toast').className = '';  // '읽는 중' 숨김
+  if (mine.length === 1) return camFound(mine[0]);
+  if (mine.length > 1) return pickCode(mine);
+  if (other.length) return toast('우리 제품코드가 아닌 바코드만 읽혔습니다 (' + other.slice(0, 2).join(', ') + '). 제품 라벨을 찍어 주세요.', true);
+  toast('바코드를 읽지 못했습니다. 바코드가 화면에 크고 선명하게 나오게 다시 찍어 주세요.', true);
+}
+// 바코드가 여러 개 찍혔을 때: 어떤 제품인지 고르기
+function pickCode(list) {
+  closeM(true);
+  const items = list.map(c => ALL.find(i => i.code.toUpperCase() === c)).filter(Boolean).sort((a, b) => a.code.localeCompare(b.code));
+  $('mkTitle').textContent = '바코드로 찾은';
+  $('mkDesc').textContent = '사진에서 제품 바코드 ' + items.length + '개가 읽혔습니다. 처리할 제품을 눌러 주세요.';
+  $('mkList').innerHTML = '<div class="mrow mh"><div></div><div>제품명 (제품코드)</div><div>적재위치</div><div class="r">현재고</div></div>'
+    + items.map(i => '<div class="mrow" onclick="openFromMaker(\'' + esc(i.code) + '\')">'
+      + (i.photo ? '<img class="mth" loading="lazy" src="/photo/' + esc(i.code) + '.jpg?thumb=1&v=' + esc(i.photo) + '" alt="">' : '<div class="mth">📷</div>')
+      + '<div><span class="pname">' + esc(i.name) + '</span> <span class="pm" style="color:var(--brand);font-weight:700">[' + esc(i.maker) + ']</span> <span style="font-size:15px">' + mood(i.qty, i.safety) + '</span>'
+      + '<span class="code">' + esc(i.code) + '</span></div>'
+      + '<div><span class="loc">' + esc(i.loc) + '</span></div><div class="mq">' + fmt(i.qty) + '</div></div>').join('');
+  $('makerModal').classList.add('show');
+}
+</script>
+{% endblock %}

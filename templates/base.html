@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>창고 재고 불출</title>
+<style>
+  :root { --bg:#f5f6f8; --card:#fff; --line:#e6e8ec; --text:#1d2129; --sub:#6b7280;
+          --brand:#2563eb; --in:#2563eb; --out:#e5484d; --ok:#16a34a; --order:#f97316; }
+  * { box-sizing:border-box; }
+  html, body { touch-action:manipulation; -webkit-text-size-adjust:100%; } /* 더블탭 확대 방지 */
+  body { margin:0; background:var(--bg); color:var(--text);
+         font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",sans-serif; font-size:15px; }
+  header { background:#fff; border-bottom:1px solid var(--line); position:sticky; top:0; z-index:10; }
+  .wrap { max-width:1080px; margin:0 auto; padding:0 16px; }
+  .top { display:flex; align-items:center; gap:24px; height:64px; }
+  .logo { display:flex; align-items:center; flex-shrink:0; text-decoration:none; }
+  .logo img { height:30px; width:auto; display:block; }
+  @media (max-width:760px) { .logo img { height:22px; } }
+  nav { display:flex; gap:4px; overflow-x:auto; }
+  nav a { padding:8px 14px; border-radius:999px; color:var(--sub); text-decoration:none; font-weight:600; white-space:nowrap; }
+  nav a.on, nav a:hover { background:#eef2ff; color:var(--brand); }
+  main { padding:24px 0 60px; }
+  h1 { font-size:22px; margin:0 0 4px; }
+  .desc { color:var(--sub); margin:0 0 20px; }
+  .btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; border:1px solid var(--line);
+         background:#fff; color:var(--text); padding:10px 16px; border-radius:10px; font-weight:700;
+         font-size:15px; cursor:pointer; text-decoration:none; }
+  .btn:hover { border-color:#c9cdd4; }
+  .btn.primary { background:var(--brand); border-color:var(--brand); color:#fff; }
+  .btn.in { background:var(--in); border-color:var(--in); color:#fff; }
+  .btn.out { background:var(--out); border-color:var(--out); color:#fff; }
+  .btn.order { background:var(--order); border-color:var(--order); color:#fff; }
+  nav .cnt { display:inline-block; min-width:20px; padding:0 6px; margin-left:4px; border-radius:999px; font-size:12px; line-height:20px; text-align:center; background:var(--out); color:#fff; }
+  nav .cnt.o { background:var(--order); }
+  nav { min-width:0; } @media (max-width:760px) { .me { display:none; } .top { gap:12px; } }
+  .me { margin-left:auto; color:var(--sub); font-size:13px; font-weight:600; white-space:nowrap; }
+  /* 기기 등록 (이름 입력) */
+  body.gated header, body.gated main { filter:blur(7px); pointer-events:none; user-select:none; }
+  .gate { position:fixed; inset:0; z-index:200; display:flex; align-items:center; justify-content:center; padding:16px; background:rgba(15,20,30,.35); }
+  .gate form { background:#fff; border-radius:18px; width:100%; max-width:380px; padding:28px 24px; box-shadow:0 20px 60px rgba(0,0,0,.25); }
+  .gate h2 { margin:0 0 6px; font-size:21px; } .gate p { margin:0 0 16px; color:var(--sub); font-size:14px; line-height:1.5; }
+  .gate input { height:52px; font-size:18px; } .gate .btn { width:100%; height:52px; margin-top:12px; font-size:17px; }
+  .gate .err { color:var(--out); font-weight:600; font-size:14px; margin-top:10px; min-height:1em; }
+  .btn:disabled { opacity:.5; cursor:not-allowed; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; }
+  .flash { padding:12px 16px; border-radius:10px; margin-bottom:16px; font-weight:600; }
+  .flash.ok { background:#ecfdf3; color:#067647; } .flash.error { background:#fef3f2; color:#b42318; }
+  input, select { font:inherit; font-size:16px; padding:10px 12px; border:1px solid var(--line); border-radius:10px; width:100%; background:#fff; }
+  input:focus { outline:2px solid #bfd3fe; border-color:var(--brand); }
+  label { font-size:13px; color:var(--sub); font-weight:600; display:block; margin-bottom:6px; }
+  table { width:100%; border-collapse:collapse; }
+  th, td { padding:12px 14px; border-bottom:1px solid var(--line); text-align:left; white-space:nowrap; }
+  th { font-size:13px; color:var(--sub); font-weight:600; background:#fafbfc; }
+  .num { text-align:right; font-variant-numeric:tabular-nums; }
+  .table-scroll { overflow-x:auto; }
+  #toast { position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(20px); opacity:0;
+           background:#1d2129; color:#fff; padding:12px 20px; border-radius:16px; font-weight:600; line-height:1.45; text-align:center;
+           transition:.25s; pointer-events:none; z-index:100; width:max-content; max-width:calc(100% - 32px);
+           word-break:keep-all; overflow-wrap:break-word; }  /* 줄바꿈은 단어 단위로 (글자 중간에서 끊지 않음) */
+  /* 팝업 공통: 뒤 배경 흐리게, 팝업이 떠 있으면 배경은 스크롤되지 않고 팝업 안만 스크롤 */
+  .dim { -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); overscroll-behavior:contain; }
+  .dim .modal { overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
+  html.locked, html.locked body { overflow:hidden; overscroll-behavior:none; }
+  #toast.show { opacity:1; transform:translateX(-50%); } #toast.err { background:var(--out); }
+</style>
+{% block head %}{% endblock %}
+</head>
+<body class="{{ 'gated' if not g.device }}">
+<header><div class="wrap top">
+  <a class="logo" href="/" title="재고현황 (메인)"><img src="/static/logo.png?v=2" alt="ACETECHNICS"></a>
+  <nav id="liveNav" data-live>
+    <a href="/" class="{{ 'on' if request.path=='/' }}">재고현황</a>
+    <a href="/shortage" class="{{ 'on' if request.path=='/shortage' }}">재고부족{% if nav_short %}<span class="cnt">{{ nav_short }}</span>{% endif %}</a>
+    <a href="/orders" class="{{ 'on' if request.path=='/orders' }}">발주요청{% if nav_orders %}<span class="cnt o">{{ nav_orders }}</span>{% endif %}</a>
+    <a href="/upload" class="{{ 'on' if request.path.startswith('/upload') }}">엑셀 일괄입력</a>
+    <a href="/log" class="{{ 'on' if request.path=='/log' }}">변경로그</a>
+    <a href="/labels" class="{{ 'on' if request.path.startswith('/label') }}">바코드 라벨</a>
+  </nav>
+  {% if g.device %}<span class="me" title="기기코드 {{ g.device.code }}">👤 {{ g.device.name }}</span>{% endif %}
+  {% block headright %}{% endblock %}
+</div></header>
+<main class="wrap">
+  {% with msgs = get_flashed_messages(with_categories=true) %}
+    {% for cat, m in msgs %}<div class="flash {{ cat }}">{{ m }}</div>{% endfor %}
+  {% endwith %}
+  {% block body %}{% endblock %}
+</main>
+<div id="toast"></div>
+{% if not g.device %}
+<div class="gate">
+  <form id="gateForm" autocomplete="off">
+    <h2>👋 처음 접속한 기기입니다</h2>
+    <p>사용자 이름을 입력하면 이 기기가 등록됩니다.<br>이 기기에서는 다음부터 입력하지 않아도 됩니다.</p>
+    <label>이름</label>
+    <input id="gateName" maxlength="30" placeholder="예: 홍길동" required autofocus>
+    <button class="btn primary">확인</button>
+    <div class="err" id="gateErr"></div>
+  </form>
+</div>
+<script>
+  document.getElementById('gateForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const name = document.getElementById('gateName').value.trim(), err = document.getElementById('gateErr');
+    if (!name) { err.textContent = '이름을 입력해 주세요.'; return; }
+    try {
+      const res = await fetch('/register', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ name }) });
+      const d = await res.json();
+      if (!d.ok) { err.textContent = d.msg; return; }
+      try { localStorage.setItem('wh_worker', d.name); } catch (x) {}
+      location.reload();
+    } catch (x) { err.textContent = '서버에 연결하지 못했습니다.'; }
+  });
+</script>
+{% endif %}
+<script>
+  // 화면 확대 막기: 두 손가락 확대(핀치), 더블탭 확대 (iOS Safari는 viewport 설정을 무시하므로 직접 차단)
+  ['gesturestart', 'gesturechange', 'gestureend'].forEach(t => document.addEventListener(t, e => e.preventDefault(), { passive:false }));
+  document.addEventListener('touchmove', e => {
+    if (e.touches.length > 1 || (e.scale && e.scale !== 1)) return e.preventDefault();
+    // 팝업이 떠 있을 때: 팝업(또는 스크롤되는 칸) 밖을 끌면 배경이 움직이지 않게
+    if (document.documentElement.classList.contains('locked') && !e.target.closest('.modal, .sugg, .msg, textarea')) e.preventDefault();
+  }, { passive:false });
+  // 팝업(.dim.show)이 열려 있는 동안 배경 스크롤 잠금
+  const syncLock = () => document.documentElement.classList.toggle('locked', !!document.querySelector('.dim.show'));
+  new MutationObserver(syncLock).observe(document.body, { subtree:true, attributes:true, attributeFilter:['class'] });
+  let lastTouch = 0;
+  document.addEventListener('touchend', e => {
+    const t = Date.now();
+    if (t - lastTouch < 350 && !e.target.closest('button, a, label, input, select, textarea, [onclick]')) e.preventDefault();  // 버튼 연속 터치는 막지 않음
+    lastTouch = t;
+  }, { passive:false });
+  document.addEventListener('dblclick', e => e.preventDefault());
+  function toast(msg, err) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.className = 'show' + (err ? ' err' : '');
+    clearTimeout(t._h); t._h = setTimeout(() => t.className = '', 2000);
+  }
+  // 담당자 이름은 이 브라우저에 기억해 둠
+  const WORKER_KEY = 'wh_worker';
+  const DEVICE_NAME = {{ (g.device.name if g.device else '')|tojson }};
+  function getWorker() { try { return localStorage.getItem(WORKER_KEY) || DEVICE_NAME; } catch (e) { return DEVICE_NAME; } }
+  function setWorker(v) { try { localStorage.setItem(WORKER_KEY, v); } catch (e) {} }
+  // 작업 후 새로고침 없이 화면 갱신: 지금 페이지를 다시 받아 data-live 부분만 바꿔 끼움
+  let liveBusy = false;
+  async function liveRefresh() {
+    if (liveBusy) return; liveBusy = true;
+    try {
+      const res = await fetch(location.pathname + location.search, { cache:'no-store', headers:{ 'X-Live':'1' } });
+      if (!res.ok) return;
+      const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+      document.querySelectorAll('[data-live][id]').forEach(el => { const n = doc.getElementById(el.id); if (n) el.replaceWith(document.importNode(n, true)); });
+      if (window.onLive) window.onLive();
+    } catch (e) {} finally { liveBusy = false; }
+  }
+  // 다른 기기에서 한 작업도 보이도록: 화면을 보고 있고 창·입력 중이 아닐 때 10초마다 갱신
+  setInterval(() => {
+    if (document.hidden || !document.querySelector('[data-live]:not(nav)')) return;
+    if (document.querySelector('.dim.show, .gate, .bulk.show')) return;
+    const a = document.activeElement; if (a && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName) && a.value) return;
+    liveRefresh();
+  }, 10000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && !document.querySelector('.dim.show')) liveRefresh(); });
+  window.addEventListener('pageshow', e => { if (e.persisted) liveRefresh(); });  // 뒤로가기로 돌아온 화면도 최신으로
+  document.querySelectorAll('input[name=worker]').forEach(i => { i.value = getWorker(); i.addEventListener('change', () => setWorker(i.value)); });
+</script>
+{% block script %}{% endblock %}
+</body>
+</html>
